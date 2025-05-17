@@ -1,0 +1,10 @@
+.env
+generate_password.py
+venv/
+*.pyc
+*.pyo
+*.pyd
+secrets/
+docker-compose.override.yml
+__pycache__/
+testing_sandground.py
