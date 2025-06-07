@@ -25,7 +25,13 @@ class Settings(BaseSettings):
     GOOGLE_PROJECT_ID: str
     GOOGLE_REGION: str
     GOOGLE_API_KEY: str
+    GMAIL_USERNAME: str
+    GMAIL_APP_PASSWORD: str
+    RECEIVER_EMAIL: str
     DEBUG: bool = False
+    TUSHARE_API_TOKEN: str
+    ALPHA_VANTAGE_API_KEY: str
+    FINNHUB_API_KEY: str
     
     class Config:
         env_file = ".env"
@@ -39,7 +45,7 @@ def load_gemini_api_key():
     Loads the Gemini API key from the secrets file.
     """
     try:
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        base_dir = os.path.dirname(os.path.abspath(__file__))
         secrets_path = os.path.join(base_dir, "secrets", "Google-ai-studio-gemini-key.txt")
         with open(secrets_path, "r") as file:
             return file.read().strip()
@@ -50,3 +56,4 @@ def load_gemini_api_key():
 
 GEMINI_API_KEY = load_gemini_api_key()
 gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+# print(settings.model_dump())

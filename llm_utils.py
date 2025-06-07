@@ -1,7 +1,7 @@
 import os
 import sys
 import time
-
+from config import settings
 script_start_time = time.time()
 print(f"{script_start_time:.2f}: Script started (using google-genai SDK pattern with client.models.generate_content).")
 
@@ -16,19 +16,72 @@ except ImportError:
 
 # --- Configuration ---
 config_start_time = time.time()
-GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
-GOOGLE_CLOUD_PROJECT = os.environ.get("GOOGLE_PROJECT_ID")
-GOOGLE_CLOUD_LOCATION = os.environ.get("GOOGLE_REGION", "us-central1")
+# GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+# GOOGLE_PROJECT_ID = os.environ.get("GOOGLE_PROJECT_ID")
+# GOOGLE_REGION = os.environ.get("GOOGLE_REGION", "us-central1")
+GOOGLE_API_KEY = settings.GOOGLE_API_KEY
+GOOGLE_PROJECT_ID = settings.GOOGLE_PROJECT_ID
+GOOGLE_REGION = settings.GOOGLE_REGION
+
 print(f"{time.time():.2f}: Environment variables loaded (took {time.time() - config_start_time:.2f}s)")
 print(f"    GOOGLE_API_KEY: {'Set' if GOOGLE_API_KEY else 'Not Set'}")
-print(f"    GOOGLE_CLOUD_PROJECT (from GOOGLE_PROJECT_ID): {GOOGLE_CLOUD_PROJECT}")
-print(f"    GOOGLE_CLOUD_LOCATION (from GOOGLE_REGION): {GOOGLE_CLOUD_LOCATION}")
+print(f"    GOOGLE_PROJECT_ID (from GOOGLE_PROJECT_ID): {GOOGLE_PROJECT_ID}")
+print(f"    GOOGLE_REGION (from GOOGLE_REGION): {GOOGLE_REGION}")
 
 GEMINI_MODELS_CONFIG = {
     "gemini-2.5-flash-exp": {"rpm": 10, "type": "vertex_via_genai", "name_override": "gemini-2.5-flash-preview-04-17"},
     "gemini-2.5-flash-latest-studio": {"rpm": 10, "type": "studio_via_genai", "name_override": "gemini-2.5-flash-preview-04-17"},
     "gemini-2.0-flash-latest-studio": {"rpm": 2, "type": "studio_via_genai", "name_override": "gemini-2.0-flash-latest"},
 }
+
+def create_clients() -> tuple[genai.Client, genai.Client]:
+    studio_client = None
+    vertex_client = None
+
+    # Initialize Google AI Studio client
+
+    if GOOGLE_API_KEY:
+        client_init_start = time.time()
+        try:
+            studio_client = genai.Client(api_key=GOOGLE_API_KEY)
+            print(f"{time.time():.2f}: Google AI Studio Client (genai.Client with api_key) initialized. (took {time.time() - client_init_start:.2f}s)")
+        except Exception as e:
+            print(f"{time.time():.2f}: Error initializing Google AI Studio Client: {e}. 'studio_via_genai' type models may fail.")
+    else:
+        print(f"{time.time():.2f}: Warning: GOOGLE_API_KEY not set. Cannot initialize Google AI Studio Client.")
+
+    # Initialize Vertex AI client
+    if GOOGLE_PROJECT_ID and GOOGLE_REGION:
+        client_init_start = time.time()
+        try:
+            # The vertexai=True flag might or might not be needed/supported by your genai.Client version.
+            # If it causes an error, remove it. Providing project & location usually suffices for ADC mode.
+            client_args = {
+                "vertexai": True,
+                "project": GOOGLE_PROJECT_ID,
+                "location": GOOGLE_REGION
+            }
+            # Add vertexai=True if you are sure your SDK version uses it and it helps
+            # client_args["vertexai"] = True # As per your recollection
+            
+            vertex_client = genai.Client(**client_args)
+            print(f"{time.time():.2f}: Vertex AI Client (genai.Client with project/location) initialized for project '{GOOGLE_PROJECT_ID}'. (took {time.time() - client_init_start:.2f}s)")
+        except TypeError as te: # Catch if 'vertexai' is an unexpected keyword
+            if 'vertexai' in str(te):
+                print(f"{time.time():.2f}: Note: 'vertexai=True' might not be a valid parameter for your genai.Client version. Trying without it.")
+                try:
+                    vertex_client = genai.Client(project=GOOGLE_PROJECT_ID, location=GOOGLE_REGION)
+                    print(f"{time.time():.2f}: Vertex AI Client (genai.Client project/location only) initialized. (took {time.time() - client_init_start:.2f}s)")
+                except Exception as e_inner:
+                    print(f"{time.time():.2f}: Error initializing Vertex AI Client (fallback attempt): {e_inner}.")
+            else:
+                print(f"{time.time():.2f}: Error initializing Vertex AI Client: {te}.")
+        except Exception as e:
+            print(f"{time.time():.2f}: Error initializing Vertex AI Client: {e}. 'vertex_via_genai' type models may fail.")
+    else:
+        print(f"{time.time():.2f}: Warning: GOOGLE_PROJECT_ID or GOOGLE_REGION not set. Cannot initialize Vertex AI Client.")
+
+    return studio_client, vertex_client
 
 # --- API Call Function using genai.Client.models.generate_content ---
 def call_model_via_genai_client(
@@ -84,62 +137,14 @@ def call_model_via_genai_client(
     finally:
         print(f"{time.time():.2f}: Exiting call_model_via_genai_client for {actual_model_name} ({client_type_str}) (total duration: {time.time() - call_api_start_time:.2f}s)")
 
-def send_query_to_first_available_model(query: str, models_config: dict) -> tuple[str, str] | None:
+def send_query_to_first_available_model(query: str, studio_client: genai.Client, vertex_client: genai.Client, models_config: dict) -> tuple[str, str] | None:
     func_start_time = time.time()
     print(f"{time.time():.2f}: Entered send_query_to_first_available_model (using genai.Client with client.models.generate_content)")
     if not models_config:
         print(f"{time.time():.2f}: Error: No models configured.")
         return None
 
-    studio_client = None
-    vertex_client = None
-
-    # Initialize Google AI Studio client
-    if any(details.get("type") == "studio_via_genai" for details in models_config.values()):
-        print(f"{time.time():.2f}: Checking for 'studio_via_genai' type models")
-        if GOOGLE_API_KEY:
-            client_init_start = time.time()
-            try:
-                studio_client = genai.Client(api_key=GOOGLE_API_KEY)
-                print(f"{time.time():.2f}: Google AI Studio Client (genai.Client with api_key) initialized. (took {time.time() - client_init_start:.2f}s)")
-            except Exception as e:
-                print(f"{time.time():.2f}: Error initializing Google AI Studio Client: {e}. 'studio_via_genai' type models may fail.")
-        else:
-            print(f"{time.time():.2f}: Warning: GOOGLE_API_KEY not set. Cannot initialize Google AI Studio Client.")
-
-    # Initialize Vertex AI client
-    if any(details.get("type") == "vertex_via_genai" for details in models_config.values()):
-        print(f"{time.time():.2f}: Checking for 'vertex_via_genai' type models")
-        if GOOGLE_CLOUD_PROJECT and GOOGLE_CLOUD_LOCATION:
-            client_init_start = time.time()
-            try:
-                # The vertexai=True flag might or might not be needed/supported by your genai.Client version.
-                # If it causes an error, remove it. Providing project & location usually suffices for ADC mode.
-                client_args = {
-                    "vertexai": True,
-                    "project": GOOGLE_CLOUD_PROJECT,
-                    "location": GOOGLE_CLOUD_LOCATION
-                }
-                # Add vertexai=True if you are sure your SDK version uses it and it helps
-                # client_args["vertexai"] = True # As per your recollection
-                
-                vertex_client = genai.Client(**client_args)
-                print(f"{time.time():.2f}: Vertex AI Client (genai.Client with project/location) initialized for project '{GOOGLE_CLOUD_PROJECT}'. (took {time.time() - client_init_start:.2f}s)")
-            except TypeError as te: # Catch if 'vertexai' is an unexpected keyword
-                if 'vertexai' in str(te):
-                    print(f"{time.time():.2f}: Note: 'vertexai=True' might not be a valid parameter for your genai.Client version. Trying without it.")
-                    try:
-                        vertex_client = genai.Client(project=GOOGLE_CLOUD_PROJECT, location=GOOGLE_CLOUD_LOCATION)
-                        print(f"{time.time():.2f}: Vertex AI Client (genai.Client project/location only) initialized. (took {time.time() - client_init_start:.2f}s)")
-                    except Exception as e_inner:
-                        print(f"{time.time():.2f}: Error initializing Vertex AI Client (fallback attempt): {e_inner}.")
-                else:
-                    print(f"{time.time():.2f}: Error initializing Vertex AI Client: {te}.")
-            except Exception as e:
-                print(f"{time.time():.2f}: Error initializing Vertex AI Client: {e}. 'vertex_via_genai' type models may fail.")
-        else:
-            print(f"{time.time():.2f}: Warning: GOOGLE_PROJECT_ID or GOOGLE_REGION not set. Cannot initialize Vertex AI Client.")
-
+    
     for model_name_key, model_details in models_config.items():
         model_type = model_details.get("type")
         print(f"\n{time.time():.2f}: Trying model: {model_name_key} (Type: {model_type})")
@@ -171,7 +176,7 @@ def send_query_to_first_available_model(query: str, models_config: dict) -> tupl
                 client_type_str, client_to_use, model_name_key, model_details, query
             )
         else:
-             print(f"{time.time():.2f}: Skipping {model_name_key}: {api_response_message}")
+            print(f"{time.time():.2f}: Skipping {model_name_key}: {api_response_message}")
 
         if success:
             print(f"{time.time():.2f}: Query successfully processed by {model_name_key} (Type: {model_type}). (Attempt took {time.time() - attempt_loop_start_time:.2f}s)")
@@ -199,8 +204,8 @@ if __name__ == "__main__":
         "3. Authenticated with Google Cloud (e.g., `gcloud auth application-default login`) for Vertex AI calls.")
     print("-" * 40)
 
-    if not GOOGLE_CLOUD_PROJECT and any(details.get("type") == "vertex_via_genai" for details in GEMINI_MODELS_CONFIG.values()):
-        print(f"{time.time():.2f}: NOTICE: GOOGLE_PROJECT_ID (for Vertex AI) resolved to: {GOOGLE_CLOUD_PROJECT if GOOGLE_CLOUD_PROJECT else 'Not Set'}")
+    if not GOOGLE_PROJECT_ID and any(details.get("type") == "vertex_via_genai" for details in GEMINI_MODELS_CONFIG.values()):
+        print(f"{time.time():.2f}: NOTICE: GOOGLE_PROJECT_ID (for Vertex AI) resolved to: {GOOGLE_PROJECT_ID if GOOGLE_PROJECT_ID else 'Not Set'}")
 
     print(f"{time.time():.2f}: Effective GEMINI_MODELS_CONFIG being used:")
     if not GEMINI_MODELS_CONFIG:
@@ -211,11 +216,12 @@ if __name__ == "__main__":
         print(f"- {name}: {details}")
     print("-" * 40)
 
+    studio_client, vertex_client = create_clients()
     user_query_example = "What are the main differences between a llama and an alpaca? Be concise."
 
     print(f"{time.time():.2f}: Attempting to send query: \"{user_query_example}\"")
     send_query_call_start_time = time.time()
-    result_tuple = send_query_to_first_available_model(user_query_example, GEMINI_MODELS_CONFIG)
+    result_tuple = send_query_to_first_available_model(user_query_example, studio_client, vertex_client, GEMINI_MODELS_CONFIG)
     print(f"{time.time():.2f}: send_query_to_first_available_model call completed (took {time.time() - send_query_call_start_time:.2f}s)")
 
     print(f"\n{time.time():.2f}: --- Query Sending Attempt Summary ---")

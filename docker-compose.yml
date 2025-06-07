@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  mongodb:
+    image: mongo
+    container_name: my-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+    # Optional: Add environment variables for username/password
+    # environment:
+    #   MONGO_INITDB_ROOT_USERNAME: yourusername
+    #   MONGO_INITDB_ROOT_PASSWORD: yourpassword
+
+volumes:
+  mongodata: 

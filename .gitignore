@@ -1,6 +1,6 @@
 .env
 generate_password.py
-venv/
+.venv/
 *.pyc
 *.pyo
 *.pyd
