@@ -39,4 +39,12 @@ jobs:
           pip install -r requirements.txt
           
           echo "Deployment successful!"
+          '
+
+      - name: Display Cron Log for Debugging
+        run: |
+          ssh ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} '
+          echo "--- Displaying contents of cron.log for debugging ---"
+          cat ~/LLM-stock-news-analysis/cron.log || echo "cron.log not found or is empty."
+          echo "--- End of cron.log ---"
           ' 
