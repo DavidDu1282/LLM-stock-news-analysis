@@ -8,20 +8,37 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: SSH and deploy
-        uses: appleboy/ssh-action@master
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH using known-working method
+        uses: webfactory/ssh-agent@v0.7.0
         with:
-          host: ${{ secrets.VM_HOST }}
-          username: ${{ secrets.VM_USERNAME }}
-          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          script: |
-            set -e
-            cd ~/LLM-stock-news-analysis
-            git pull
-            echo "Fetched latest code from GitHub."
-            source .venv/bin/activate
-            echo "Activated Python virtual environment."
-            pip install -r requirements.txt
-            echo "Installed/updated Python packages."
-            echo "Deployment to VM successful!" 
+          ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+
+      - name: Add host key to known hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.VM_HOST }} >> ~/.ssh/known_hosts
+
+      - name: SSH to VM and deploy
+        run: |
+          ssh ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} << 'EOF'
+          
+          set -e
+          echo "Navigating to project directory..."
+          cd ~/LLM-stock-news-analysis
+          
+          echo "Pulling latest code from GitHub..."
+          git pull
+          
+          echo "Activating Python virtual environment..."
+          source .venv/bin/activate
+          
+          echo "Installing/updating Python packages..."
+          pip install -r requirements.txt
+          
+          echo "Deployment successful!"
+          
+          EOF 
