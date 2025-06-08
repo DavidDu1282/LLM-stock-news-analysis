@@ -24,8 +24,7 @@ jobs:
 
       - name: SSH to VM and deploy
         run: |
-          ssh ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} << 'EOF'
-          
+          ssh ${{ secrets.VM_USERNAME }}@${{ secrets.VM_HOST }} '
           set -e
           echo "Navigating to project directory..."
           cd ~/LLM-stock-news-analysis
@@ -40,5 +39,4 @@ jobs:
           pip install -r requirements.txt
           
           echo "Deployment successful!"
-          
-          EOF 
+          ' 
