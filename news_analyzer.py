@@ -362,6 +362,10 @@ class NewsAnalyzer:
                 })
             else:
                 final_results.append(res)
+            
+            # Add a small delay to avoid hitting API rate limits
+            await asyncio.sleep(1)
+
         logger.info(f"Finished {analysis_type} batch analysis for {db_name}/{collection_name}. Processed {len(final_results)} results.")
         return final_results
 
