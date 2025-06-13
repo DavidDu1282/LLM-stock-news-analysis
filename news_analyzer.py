@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import textwrap
 import argparse
+import pytz
 
 # Third-Party Imports
 import pandas as pd
@@ -251,7 +252,7 @@ class NewsAnalyzer:
             **Your Task:**
             Provide a structured analysis in Chinese. Your entire response MUST strictly follow the format below, using the exact headers without any markdown (like ** or *):
 
-            Importance_Score: [1-10, where 10 is critically important]
+            Importance_Score: [1-10, where 10 is critically important. Be conservative: only use 8+ for major policy changes, large company earnings, or significant market events. Most routine news should be 5-7.]
             Sentiment_Score: [1-10, where 1 is very negative, 5 is neutral, 10 is very positive]
             Affected_Sectors_Start
             - [Sector Name 1]: [Brief explanation of the impact]
@@ -272,8 +273,8 @@ class NewsAnalyzer:
             **Your Task:**
             Provide a structured analysis in Chinese. Your entire response MUST strictly follow the format below, using the exact headers without any markdown (like ** or *):
 
-            Importance_Score: [1-10]
-            Sentiment_Score: [1-10]
+            Importance_Score: [1-10, where 10 is critically important. Be conservative: only use 8+ for major policy changes, large company earnings, or significant market events. Most routine news should be 5-7.]
+            Sentiment_Score: [1-10, where 1 is very negative, 5 is neutral, 10 is very positive]
             Affected_Sectors_Start
             - [Sector Name 1]: [Brief explanation of the impact]
             - [Sector Name 2]: [Brief explanation of the impact]
@@ -547,7 +548,7 @@ if __name__ == "__main__":
     
     # Alert Thresholds are now the only separate config needed here
     ALERT_THRESHOLDS = {
-        "IMPORTANCE_THRESHOLD": 7,
+        "IMPORTANCE_THRESHOLD": 8,  # Raised from 7 to 8 to reduce trivial news
         "POSITIVE_SENTIMENT_THRESHOLD": 8,
         "NEGATIVE_SENTIMENT_THRESHOLD": 3,
     }
@@ -569,9 +570,17 @@ if __name__ == "__main__":
     ]
     
     try:
-        current_hour = datetime.now().hour
-        if 8 <= current_hour < 16:
-            logger.info("Starting morning analysis pipeline (US news focus)")
+        # Get current time in China timezone (UTC+8) for proper analysis type selection
+        china_tz = pytz.timezone('Asia/Shanghai')
+        china_time = datetime.now(china_tz)
+        china_hour = china_time.hour
+        
+        logger.info(f"Current China time: {china_time.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        
+        # Morning analysis: 6 AM - 2 PM China time (before/during market hours)
+        # Evening analysis: 2 PM - 6 AM China time (after market close)
+        if 6 <= china_hour < 14:
+            logger.info("Starting morning analysis pipeline (US news focus) - China market opening soon/open")
             asyncio.run(run_analysis_pipeline_for_sources(
                 news_analyzer_instance, 
                 us_sources, 
@@ -581,7 +590,7 @@ if __name__ == "__main__":
                 max_age_days=args.days
             ))
         else:
-            logger.info("Starting evening analysis pipeline (Chinese news focus)")
+            logger.info("Starting evening analysis pipeline (Chinese news focus) - China market closed")
             asyncio.run(run_analysis_pipeline_for_sources(
                 news_analyzer_instance, 
                 chinese_sources, 

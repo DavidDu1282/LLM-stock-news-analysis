@@ -8,6 +8,7 @@ PROJECT_DIR="/home/ubuntu/LLM-stock-news-analysis"
 PYTHON_EXEC="$PROJECT_DIR/.venv/bin/python"
 ANALYZER_SCRIPT="$PROJECT_DIR/news_analyzer.py"
 CRAWLER_SCRIPT="$PROJECT_DIR/main_crawler.py"
+FINNHUB_IMPORTER_SCRIPT="$PROJECT_DIR/finnhub_news_importer.py"
 LOG_FILE="$PROJECT_DIR/cron.log"
 ARTICLES_TO_FETCH=50 # Number of articles to crawl and analyze per run
 # --- End Configuration ---
@@ -20,17 +21,27 @@ echo "======================================================================" >>
 echo "PIPELINE STARTED AT: $(date)" >> "$LOG_FILE"
 echo "======================================================================" >> "$LOG_FILE"
 
-# --- Step 1: Run Crawlers ---
-echo "[$(date)] Starting crawlers (fetching up to $ARTICLES_TO_FETCH articles per source)..." >> "$LOG_FILE"
+# --- Step 1: Run Chinese News Crawlers ---
+echo "[$(date)] Starting Chinese news crawlers (fetching up to $ARTICLES_TO_FETCH articles per source)..." >> "$LOG_FILE"
 "$PYTHON_EXEC" "$CRAWLER_SCRIPT" --limit "$ARTICLES_TO_FETCH" >> "$LOG_FILE" 2>&1
 if [ $? -eq 0 ]; then
-  echo "[$(date)] Crawlers finished successfully." >> "$LOG_FILE"
+  echo "[$(date)] Chinese news crawlers finished successfully." >> "$LOG_FILE"
 else
-  echo "[$(date)] ERROR: Crawlers exited with a failure code." >> "$LOG_FILE"
+  echo "[$(date)] ERROR: Chinese news crawlers exited with a failure code." >> "$LOG_FILE"
 fi
 echo "---" >> "$LOG_FILE"
 
-# --- Step 2: Run Analyzer ---
+# --- Step 2: Run US News Importer (Finnhub) ---
+echo "[$(date)] Starting US news importer (Finnhub)..." >> "$LOG_FILE"
+"$PYTHON_EXEC" "$FINNHUB_IMPORTER_SCRIPT" >> "$LOG_FILE" 2>&1
+if [ $? -eq 0 ]; then
+  echo "[$(date)] US news importer finished successfully." >> "$LOG_FILE"
+else
+  echo "[$(date)] ERROR: US news importer exited with a failure code." >> "$LOG_FILE"
+fi
+echo "---" >> "$LOG_FILE"
+
+# --- Step 3: Run Analyzer ---
 echo "[$(date)] Starting analyzer (processing up to $ARTICLES_TO_FETCH articles per source)..." >> "$LOG_FILE"
 "$PYTHON_EXEC" "$ANALYZER_SCRIPT" --days 1 --limit "$ARTICLES_TO_FETCH" >> "$LOG_FILE" 2>&1
 if [ $? -eq 0 ]; then
