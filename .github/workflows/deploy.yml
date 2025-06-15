@@ -37,7 +37,10 @@ jobs:
           
           echo "Installing/updating Python packages..."
           pip install -r requirements.txt
-          
+
+          echo "Enable shell script execution..."
+          chmod +x ~/LLM-stock-news-analysis/run_analysis.sh
+
           echo "Deployment successful!"
           '
 
