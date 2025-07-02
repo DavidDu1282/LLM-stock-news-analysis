@@ -30,8 +30,8 @@ print(f"    GOOGLE_REGION (from GOOGLE_REGION): {GOOGLE_REGION}")
 
 GEMINI_MODELS_CONFIG = {
     "gemini-2.5-flash-exp": {"rpm": 10, "type": "vertex_via_genai", "name_override": "gemini-2.5-flash-exp"},
-    "gemini-2.5-flash-latest-studio": {"rpm": 10, "type": "studio_via_genai", "name_override": "gemini-2.5-flash-preview-04-17"},
-    "gemini-2.0-flash-latest-studio": {"rpm": 2, "type": "studio_via_genai", "name_override": "gemini-2.0-flash-latest"},
+    "gemini-2.5-flash-lite": {"rpm": 10, "type": "studio_via_genai", "name_override": "gemini-2.5-flash-lite-preview-06-17"},
+    "gemini-2.0-flash": {"rpm": 2, "type": "studio_via_genai", "name_override": "gemini-2.5-flash"},
 }
 
 def create_clients() -> tuple[genai.Client, genai.Client]:
