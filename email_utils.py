@@ -33,30 +33,29 @@ class EmailService:
             subject (str): The subject of the email.
             body (str): The body of the email (can be HTML or plain text).
         """
-        for receiver in self.receiver_email:
-            message = MIMEMultipart("alternative")
-            message["Subject"] = subject
-            message["From"] = self.sender_email
-            message["To"] = receiver
+        message = MIMEMultipart("alternative")
+        message["Subject"] = subject
+        message["From"] = self.sender_email
+        message["To"] = ", ".join(self.receiver_email)
 
-            # Attach the body to the email
-            message.attach(MIMEText(body, "plain"))
+        # Attach the body to the email
+        message.attach(MIMEText(body, "plain"))
 
-            try:
-                # Create a secure SSL context
-                context = ssl.create_default_context()
-                
-                logger.info(f"Connecting to SMTP server {self.smtp_server}:{self.port}...")
-                with smtplib.SMTP(self.smtp_server, self.port) as server:
-                    server.starttls(context=context)  # Secure the connection
-                    server.login(self.sender_email, self.password)
-                    server.sendmail(
-                        self.sender_email, self.receiver_email, message.as_string()
-                    )
-                logger.info(f"Email alert titled '{subject[:30]}...' sent successfully to {self.receiver_email}.")
-            except smtplib.SMTPAuthenticationError as e:
-                logger.error(f"SMTP Authentication Error: Failed to send email. Please check your Gmail username and app password. Error: {e}")
-                raise
-            except Exception as e:
-                logger.error(f"An error occurred while sending email: {e}", exc_info=True)
-                raise 
+        try:
+            # Create a secure SSL context
+            context = ssl.create_default_context()
+            
+            logger.info(f"Connecting to SMTP server {self.smtp_server}:{self.port}...")
+            with smtplib.SMTP(self.smtp_server, self.port) as server:
+                server.starttls(context=context)  # Secure the connection
+                server.login(self.sender_email, self.password)
+                server.sendmail(
+                    self.sender_email, self.receiver_email, message.as_string()
+                )
+            logger.info(f"Email alert titled '{subject[:30]}...' sent successfully to {self.receiver_email}.")
+        except smtplib.SMTPAuthenticationError as e:
+            logger.error(f"SMTP Authentication Error: Failed to send email. Please check your Gmail username and app password. Error: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"An error occurred while sending email: {e}", exc_info=True)
+            raise 
